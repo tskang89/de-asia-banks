@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>독일 소재 한·중·일 금융기관</title>
+<meta name="description" content="독일에 진출한 한국·중국·일본계 은행·자동차금융·증권사 15곳의 HGB 재무제표(2021~2025)와 국가별 비교">
+<link rel="stylesheet" href="style.css">
+<script>
+  try { var t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+</head>
+<body>
+<header class="site">
+  <div class="wrap">
+    <a class="brand" href="#/">독일 소재 한·중·일 금융기관<small>HGB 재무제표 2021–2025</small></a>
+    <nav class="main">
+      <a href="#/" data-nav="home">기관 목록</a>
+      <a href="#/compare" data-nav="compare">국가별 비교</a>
+      <a href="#/about" data-nav="about">자료·방법</a>
+    </nav>
+    <button id="theme" type="button" aria-label="화면 테마 전환">테마</button>
+  </div>
+</header>
+<main>
+  <div class="wrap" id="app"><p class="muted">불러오는 중…</p></div>
+</main>
+<footer>
+  <div class="wrap">
+    출처: Unternehmensregister 공시 Jahresabschluss(HGB 개별재무제표) 69건. 단위 유로. 지표는 기초·기말 평균 잔액 기준.
+    수치는 원문에서 추출·검산한 값이며 투자 판단 자료가 아니다. <span id="gen"></span>
+  </div>
+</footer>
+<script src="app.js"></script>
+</body>
+</html>
