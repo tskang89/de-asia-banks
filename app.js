@@ -352,6 +352,7 @@ function renderInst(id) {
       `<button type="button" data-v="${k}" class="${detState.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
     <div class="table-scroll" id="stm"></div>
   </div>`;
+  h += notesSection(i);
   if (text.length) {
     h += `<h2>${T('해설', 'Commentary')}</h2><div class="card prose">${text.map(p => `<p>${p}</p>`).join('')}
     <details><summary class="small muted">${T(`출처 각주 ${Object.keys(notes).length}개`, `${Object.keys(notes).length} source notes`)}</summary><ol class="fns">` +
@@ -362,6 +363,13 @@ function renderInst(id) {
   chart(() => barChart(document.getElementById('c-ta'), { labels: ys.map(y => fyLabel(i, y)), values: ys.map(y => i.ratios[y].TA), unit: UM() }));
   chart(() => barChart(document.getElementById('c-ni'), { labels: ys.map(y => fyLabel(i, y)), values: ys.map(y => i.ratios[y].NI), unit: UM() }));
   drawStatement(i);
+  drawNotes(i);
+  document.getElementById('fntabs').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    fnState.tab = b.dataset.v; fnState.year = 'all';
+    document.querySelectorAll('#fntabs button').forEach(x => x.classList.toggle('on', x === b));
+    drawNotes(i);
+  });
   onSeg('unit', v => { detState.unit = v; drawStatement(i); document.querySelectorAll('#unit button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); });
   document.getElementById('stabs').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
@@ -404,6 +412,88 @@ function toast(html) {
   if (!t) { t = document.createElement('div'); t.id = 'toast'; document.body.appendChild(t); }
   t.innerHTML = html; t.classList.add('on');
   clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 3500);
+}
+
+// ---------- 주석·경영보고서 ----------
+const fnState = { tab: 'ratios', year: 'all' };
+function fnTabs(i) {
+  const f = i.fn, tabs = [];
+  if (f.ratios.length) tabs.push(['ratios', T('자본·유동성', 'Capital & liquidity')]);
+  if (Object.keys(f.maturity).length) tabs.push(['maturity', T('만기 구조', 'Maturities')]);
+  if (f.reserves.length) tabs.push(['reserves', T('§340f·§340g 준비금', '§340f/§340g reserves')]);
+  f.lists.forEach(l => tabs.push([l.topic, { related_party: T('본점·그룹 거래', 'Head office & group'), loan_loss: T('대손·충당금', 'Loan losses'), mgmt_explanation: T('경영진 설명', 'Management commentary'), other: T('기타 주석', 'Other notes') }[l.topic]]));
+  return tabs;
+}
+function notesSection(i) {
+  const tabs = fnTabs(i);
+  if (!tabs.length) return '';
+  if (!tabs.some(t => t[0] === fnState.tab)) fnState.tab = tabs[0][0];
+  return `<h2>${T('주석·경영보고서', 'Notes & management report')}</h2>
+  <p class="muted small" style="margin-top:-4px">${T(
+    '재무제표 주석(Anhang)과 경영보고서(Lagebericht)에서 뽑은 항목이다. 금액은 백만 유로. 독일어 문장은 원문 그대로 두었다.',
+    'Items extracted from the notes (Anhang) and management report (Lagebericht). Amounts in EUR millions. German text is quoted from the original.')}</p>
+  <div class="card flush">
+    <div class="tabs" id="fntabs">${tabs.map(([k, l]) => `<button type="button" data-v="${k}" class="${fnState.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div id="fnbody"></div>
+  </div>`;
+}
+const ntxt = r => (EN() && r.te ? r.te : r.t) || '';
+function pctNote(v) { return isNum(v) ? minus(nfE.format(v)) + '%' : '–'; }
+function drawNotes(i) {
+  const f = i.fn, host = document.getElementById('fnbody'), ys = i.years, tab = fnState.tab;
+  if (!host) return;
+  let h = '';
+  if (tab === 'ratios') {
+    h = `<div class="table-scroll"><table class="sticky"><thead><tr><th>${T('항목', 'Item')}</th>${ys.map(y => `<th class="num">${fyLabel(i, y)}</th>`).join('')}</tr></thead><tbody>` +
+      f.ratios.map(r => `<tr><td class="label">${esc(EN() ? r.label_en : r.label)}${r.kind === 'teur' ? ` <span class="muted small">${UM()}</span>` : ''}</td>` +
+        ys.map(y => { const v = r.v[y]; return `<td class="num" title="${esc(r.src[y] || '')}">${r.kind === 'pct' ? pctNote(v) : money(v)}</td>`; }).join('') + '</tr>').join('') +
+      `</tbody></table></div><p class="muted small fnfoot">${T('LCR·NSFR 최저 요건은 100%. 지점은 본점 기준 비율을 공시하거나 공시하지 않는 경우가 많다.', 'Minimum LCR and NSFR requirements are 100%. Branches often report head-office ratios or none at all.')}</p>`;
+  } else if (tab === 'maturity') {
+    const myears = Object.keys(f.maturity).sort().reverse();
+    if (fnState.year === 'all' || !f.maturity[fnState.year]) fnState.year = myears[0];
+    const d = f.maturity[fnState.year];
+    const LINES = [['lb', '은행 앞 대출', 'Loans to banks'], ['lc', '고객 대출', 'Loans to customers'], ['ho_a', '본점 계정(자산)', 'Head office (asset)'],
+      ['db', '은행 차입', 'Due to banks'], ['dc', '고객 예금', 'Due to customers'], ['ho_l', '본점 계정(부채)', 'Head office (liability)'], ['debtsec', '발행 채권', 'Securitised liabilities']];
+    const BK = [['demand', '요구불', 'On demand'], ['upto3m', '3개월 이내', '≤ 3m'], ['3m_1y', '3개월~1년', '3m–1y'], ['1y_5y', '1~5년', '1–5y'], ['over5y', '5년 초과', '> 5y'], ['indef', '기한 없음', 'Indefinite']];
+    const bks = BK.filter(([b]) => Object.values(d).some(l => l[b]));
+    h = `<div class="controls" style="padding:12px 12px 0">${seg('fny', myears.map(y => [y, fyLabel(i, +y)]), fnState.year)}</div>
+    <div class="table-scroll"><table class="sticky"><thead><tr><th>${T('잔존만기', 'Residual maturity')}</th>${bks.map(([, k, e]) => `<th class="num">${T(k, e)}</th>`).join('')}<th class="num">${T('합계', 'Total')}</th></tr></thead><tbody>` +
+      LINES.filter(([l]) => d[l]).map(([l, k, e]) => {
+        const row = d[l]; let sum = 0;
+        const cells = bks.map(([b]) => { const c = row[b]; if (c) sum += c.v; return `<td class="num" title="${esc(c ? c.src : '')}">${c ? money(c.v) : '–'}</td>`; }).join('');
+        return `<tr><td class="label">${T(k, e)}</td>${cells}<td class="num"><b>${money(sum)}</b></td></tr>`;
+      }).join('') +
+      `</tbody></table></div><p class="muted small fnfoot">${T('합계는 표에 나온 구간을 더한 값으로, 경과이자·충당금 등이 빠져 대차대조표 금액과 다를 수 있다.', 'Totals add the buckets shown; accrued interest and allowances are excluded, so they can differ from balance-sheet amounts.')}</p>`;
+  } else if (tab === 'reserves') {
+    h = `<div class="table-scroll"><table class="sticky"><thead><tr><th>${T('항목', 'Item')}</th>${ys.map(y => `<th class="num">${fyLabel(i, y)}</th>`).join('')}</tr></thead><tbody>` +
+      f.reserves.map(r => `<tr><td class="label">${esc(EN() ? r.label_en : r.label)} <span class="muted small">${UM()}</span></td>` +
+        ys.map(y => {
+          const c = r.c[y]; if (!c) return '<td class="num">–</td>';
+          const tip = `${ntxt(c)} (${c.src})`;
+          return c.nd ? `<td class="num muted" title="${esc(tip)}">${T('미공시', 'n/d')}</td>` : `<td class="num${cls(c.v)}" title="${esc(tip)}">${money(c.v)}</td>`;
+        }).join('') + '</tr>').join('') +
+      `</tbody></table></div><p class="muted small fnfoot">${T(
+        '§340f 준비금은 공개하지 않아도 되고 대손 항목과 상계된다. "미공시"는 원문이 금액을 밝히지 않은 경우다. 셀을 누르면 원문 설명이 나온다.',
+        '§340f reserves need not be disclosed and are netted against loan-loss items. "n/d" means the filing does not state the amount. Tap a cell for the original wording.')}</p>`;
+  } else {
+    const l = f.lists.find(x => x.topic === tab);
+    const lyears = [...new Set(l.rows.map(r => r.y))].sort().reverse();
+    if (fnState.year !== 'all' && !lyears.includes(+fnState.year)) fnState.year = 'all';
+    const rows = l.rows.filter(r => fnState.year === 'all' || r.y === +fnState.year).sort((a, b) => b.y - a.y);
+    h = `<div class="controls" style="padding:12px 12px 0">${seg('fny', [['all', T('전체', 'All')], ...lyears.map(y => [y, fyLabel(i, y)])], fnState.year)}</div><div class="fnlist">`;
+    let cur = null;
+    rows.forEach(r => {
+      if (r.y !== cur) { cur = r.y; h += `<div class="fnyear">${fyLong(i, r.y)}</div>`; }
+      const val = r.v == null ? '' : r.u === 'pct' ? pctNote(r.v) : `${money(r.v)} ${UM()}`;
+      h += `<div class="fnrow">${r.lab ? `<span class="badge">${esc(T(r.lab[0], r.lab[1]))}</span> ` : ''}<span class="fntext">${esc(ntxt(r) || r.i)}</span>
+        ${val ? `<span class="fnval${cls(r.v)}">${val}</span>` : ''}<span class="fnsrc">${esc(r.src)}</span></div>`;
+    });
+    h += '</div>';
+  }
+  host.innerHTML = h;
+  const fy = document.getElementById('fny');
+  if (fy) onSeg('fny', v => { fnState.year = v; drawNotes(i); });
+  host.querySelectorAll('td[title]').forEach(td => td.addEventListener('click', () => { if (td.title) toast(esc(td.title)); }));
 }
 
 // ---------- 국가별 비교 ----------
@@ -522,6 +612,40 @@ function compositionList(cat, year) {
   return `<div class="note small"><b>${T(`${CAT_LABEL[cat][0]} 구성(${CAT_NOTE[cat][0]}).`, `${CAT_LABEL[cat][1]}: ${CAT_NOTE[cat][1]}.`)}</b> ${T(`줄 그은 기관은 ${year}년 자료가 없다.`, `Struck-through institutions have no data for ${year}.`)}${byC}</div>`;
 }
 
+// ---------- 변경 이력 ----------
+function renderChanges() {
+  const ch = (DATA.changes || []).slice().sort((a, b) => (b.date + b.id + b.y).localeCompare(a.date + a.id + a.y));
+  const KIND = { restated: ['재작성', 'Restated'], added: ['추가', 'Added'], removed: ['삭제', 'Removed'] };
+  let h = `<h1>${T('변경 이력', 'Change log')}</h1>
+  <p class="lead">${T(
+    '새 공시가 들어와 이미 실린 연도의 값이 바뀌면 여기에 남긴다. 같은 연도가 두 재무제표(당해 열과 다음 해의 전년 열)에 나오면 사이트는 최신 재무제표 값을 쓴다. 첫 줄들은 처음 게시할 때 이미 확인된 재작성이다.',
+    'When a new filing changes a figure already shown, the change is recorded here. If a year appears in two filings (current-year column and the next year\'s prior-year column), the site uses the later filing. The first entries are restatements already identified at first publication.')}</p>`;
+  if (!ch.length) { $app.innerHTML = h + `<p class="muted">${T('기록 없음.', 'No changes recorded.')}</p>`; return; }
+  const dates = [...new Set(ch.map(c => c.date))];
+  dates.forEach(d => {
+    const rows = ch.filter(c => c.date === d);
+    h += `<h2>${esc(d)} <span class="muted small">${T(`${rows.length}건`, `${rows.length} entries`)}</span></h2>
+    <div class="card flush"><div class="table-scroll"><table class="sticky"><thead><tr>
+      <th>${T('기관', 'Institution')}</th><th>${T('연도', 'Year')}</th><th>${T('구분', 'Type')}</th><th>${T('항목', 'Item')}</th>
+      <th class="num">${T('이전 값', 'Old')}</th><th class="num">${T('새 값', 'New')}</th><th class="num">${T('차이', 'Change')}</th>
+      <th>${T('출처(이전 → 새)', 'Source (old → new)')}</th><th>${T('비고', 'Note')}</th></tr></thead><tbody>`;
+    rows.forEach(c => {
+      const i = DATA.institutions.find(x => x.id === c.id);
+      const diff = isNum(c.old) && isNum(c.new) ? c.new - c.old : null;
+      const note = EN() ? (c.note_en || '') : (c.note || '');
+      h += `<tr><td>${i ? `<a href="#/inst/${i.id}">${esc(instName(i))}</a>` : esc(c.id || '')}</td>
+        <td>${i ? fyLabel(i, c.y) : c.y}</td><td><span class="badge">${T(...(KIND[c.kind] || [c.kind, c.kind]))}</span></td>
+        <td>${esc(EN() ? c.label_en : c.label)}</td>
+        <td class="num">${money(c.old, 'k')}</td><td class="num">${money(c.new, 'k')}</td><td class="num${cls(diff)}">${isNum(diff) ? (diff > 0 ? '+' : '') + money(diff, 'k') : '–'}</td>
+        <td class="small muted">${esc(c.src_old)}${c.src_old && c.src_new ? ' → ' : ''}${esc(c.src_new)}</td>
+        <td class="small" style="white-space:normal;min-width:220px">${esc(note)}</td></tr>`;
+    });
+    h += '</tbody></table></div></div>';
+  });
+  h += `<p class="muted small">${T('금액 단위 천 유로(원문 단위).', 'Amounts in EUR thousands (as filed).')}</p>`;
+  $app.innerHTML = h;
+}
+
 // ---------- 자료·방법 ----------
 function renderAbout() {
   const defs = ['nii_avg_ta', 'nfi_share', 'cir', 'credit_cost', 'roa', 'roe', 'eq_ta', 'fund_cust', 'fund_intra', 'Eq', 'Liab', 'employees'];
@@ -574,6 +698,7 @@ function route() {
   if (page === 'inst') renderInst(parts[1]);
   else if (page === 'compare') renderCompare();
   else if (page === 'about') renderAbout();
+  else if (page === 'changes') renderChanges();
   else renderHome();
   window.scrollTo(0, 0);
 }
@@ -586,7 +711,7 @@ document.getElementById('theme').addEventListener('click', () => {
 });
 
 applyChrome();
-fetch('data.json?v=5').then(r => r.json()).then(d => {
+fetch('data.json?v=7').then(r => r.json()).then(d => {
   DATA = d;
   applyChrome();
   window.addEventListener('hashchange', route);

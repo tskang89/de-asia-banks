@@ -284,3 +284,17 @@ header.site .seg.lang + #theme { margin-left: 0; }
   nav.main { order: 3; flex: 0 0 calc(100% - 52px); }
   #theme { order: 4; margin-left: auto; }
 }
+
+/* 주석 탭 */
+.fnlist { padding: 4px 12px 12px; }
+.fnyear { font-weight: 700; font-size: 13px; color: var(--text-2); margin: 14px 0 4px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+.fnrow { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; padding: 7px 0; border-bottom: 1px dashed var(--border); font-size: 14px; }
+.fnrow:last-child { border-bottom: none; }
+.fntext { flex: 1 1 420px; min-width: 0; }
+.fnval { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fnval.neg { color: var(--neg); }
+.fnsrc { font-size: 12px; color: var(--text-3); white-space: nowrap; }
+.fnfoot { padding: 0 12px 10px; margin: 8px 0 0; }
+#fntabs { flex-wrap: nowrap; overflow-x: auto; }
+#fntabs button { white-space: nowrap; }
+@media (max-width: 640px) { .fntext { flex-basis: 100%; } .fnrow { font-size: 13px; } }
