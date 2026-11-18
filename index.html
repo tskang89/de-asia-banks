@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>독일 소재 한·중·일 금융기관</title>
-<meta name="description" content="독일에 진출한 한국·중국·일본계 은행·자동차금융·증권사 15곳의 HGB 재무제표(2021~2025)와 국가별 비교">
-<link rel="stylesheet" href="style.css?v=3">
+<meta name="description" content="독일에 진출한 한국·중국·일본계 은행·자동차금융·증권사 15곳의 HGB 재무제표(2021~2025)와 국가별 비교 / HGB financial statements (2021–2025) of 15 Korean, Chinese and Japanese banks, auto-finance and securities firms in Germany">
+<link rel="stylesheet" href="style.css?v=5">
 <script>
   try { var t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
 </script>
@@ -13,24 +13,28 @@
 <body>
 <header class="site">
   <div class="wrap">
-    <a class="brand" href="#/">독일 소재 한·중·일 금융기관<small>HGB 재무제표 2021–2025</small></a>
+    <a class="brand" href="#/"><span data-ko="독일 소재 한·중·일 금융기관" data-en="Asian Banks in Germany">독일 소재 한·중·일 금융기관</span><small data-ko="HGB 재무제표 2021–2025" data-en="HGB financials 2021–2025">HGB 재무제표 2021–2025</small></a>
     <nav class="main">
-      <a href="#/" data-nav="home">기관 목록</a>
-      <a href="#/compare" data-nav="compare">국가별 비교</a>
-      <a href="#/about" data-nav="about">자료·방법</a>
+      <a href="#/" data-nav="home" data-ko="기관 목록" data-en="Institutions">기관 목록</a>
+      <a href="#/compare" data-nav="compare" data-ko="국가별 비교" data-en="By country">국가별 비교</a>
+      <a href="#/about" data-nav="about" data-ko="자료·방법" data-en="Methods">자료·방법</a>
     </nav>
-    <button id="theme" type="button" aria-label="화면 테마 전환">테마</button>
+    <div class="seg lang" id="lang" role="group" aria-label="Language">
+      <button type="button" data-v="ko" lang="ko">한국어</button><button type="button" data-v="en" lang="en">English</button>
+    </div>
+    <button id="theme" type="button" aria-label="Light/dark theme" title="Light/dark">◐</button>
   </div>
 </header>
 <main>
-  <div class="wrap" id="app"><p class="muted">불러오는 중…</p></div>
+  <div class="wrap" id="app"><p class="muted">…</p></div>
 </main>
 <footer>
   <div class="wrap">
-    출처: Unternehmensregister 공시 Jahresabschluss(HGB 개별재무제표) 69건. 단위 유로. 지표는 기초·기말 평균 잔액 기준.
-    수치는 원문에서 추출·검산한 값이며 투자 판단 자료가 아니다. <span id="gen"></span>
+    <span data-ko="출처: Unternehmensregister 공시 Jahresabschluss(HGB 개별재무제표) 69건. 단위 유로. 지표는 기초·기말 평균 잔액 기준. 수치는 원문에서 추출·검산한 값이며 투자 판단 자료가 아니다."
+      data-en="Source: 69 Jahresabschluss filings (HGB single-entity financial statements) in the Unternehmensregister. Amounts in euros; ratios on average opening and closing balances. Figures were extracted and checked from the original filings and are not investment advice.">출처: Unternehmensregister 공시 Jahresabschluss(HGB 개별재무제표) 69건. 단위 유로. 지표는 기초·기말 평균 잔액 기준. 수치는 원문에서 추출·검산한 값이며 투자 판단 자료가 아니다.</span>
+    <span id="gen"></span>
   </div>
 </footer>
-<script src="app.js?v=3"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>

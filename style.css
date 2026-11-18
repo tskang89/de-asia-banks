@@ -269,3 +269,18 @@ table.sticky tbody tr:hover td:first-child { background: var(--surface-2); }
 }
 #toast.on { opacity: 1; transform: translate(-50%, 0); }
 #stm td.num { cursor: pointer; }
+.seg.lang button { padding: 4px 10px; font-size: 13px; }
+header.site .seg.lang { margin-left: auto; }
+header.site .seg.lang + #theme { margin-left: 0; }
+@media (max-width: 600px) {
+  header.site .seg.lang { margin-left: auto; }
+  #theme { margin-left: 0; }
+  .seg.lang button { padding: 3px 8px; font-size: 12px; }
+}
+#theme { font-size: 15px; line-height: 1; padding: 5px 9px; }
+@media (max-width: 600px) { .brand { font-size: 15px; } }
+@media (max-width: 600px) {
+  .brand { flex: 1; min-width: 0; }
+  nav.main { order: 3; flex: 0 0 calc(100% - 52px); }
+  #theme { order: 4; margin-left: auto; }
+}
