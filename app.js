@@ -97,11 +97,12 @@ function barPath(x, y0, y1, w, r) {
   return `M${x},${y0}V${y1 - r}Q${x},${y1} ${x + r},${y1}H${x + w - r}Q${x + w},${y1} ${x + w},${y1 - r}V${y0}Z`;
 }
 function barChart(host, { labels, values, fmt, unit }) {
-  const W = 520, H = 220, m = { l: 56, r: 12, t: 22, b: 26 };
+  const W = Math.max(260, Math.round(host.clientWidth || 520)), H = W < 420 ? 190 : 220, m = { l: 48, r: 8, t: 22, b: 26 };
   const vals = values.filter(isNum);
   const ticks = niceTicks(Math.min(0, ...vals), Math.max(0, ...vals), 4);
   const y = v => m.t + (ticks[ticks.length - 1] - v) / (ticks[ticks.length - 1] - ticks[0]) * (H - m.t - m.b);
   const band = (W - m.l - m.r) / labels.length, bw = Math.min(44, band * 0.56);
+  const vl = v => fmt(v).replace(' 백만 유로', '');
   let s = `<svg viewBox="0 0 ${W} ${H}" role="img">`;
   ticks.forEach(t => {
     s += `<line class="${t === 0 ? 'zero' : 'gridline'}" x1="${m.l}" x2="${W - m.r}" y1="${y(t)}" y2="${y(t)}"/>`;
@@ -113,25 +114,27 @@ function barChart(host, { labels, values, fmt, unit }) {
     s += `<text x="${cx}" y="${H - 6}" text-anchor="middle">${esc(labels[i])}</text>`;
     if (!isNum(v)) { s += `<text x="${cx}" y="${y(0) - 6}" text-anchor="middle">미공시</text>`; return; }
     s += `<path d="${barPath(cx - bw / 2, y(0), y(v), bw, 4)}" fill="${v < 0 ? 'var(--bar-neg)' : 'var(--bar)'}"/>`;
-    if (i === last) s += `<text class="vlbl" x="${cx}" y="${v < 0 ? y(v) + 14 : y(v) - 6}" text-anchor="middle">${fmt(v)}</text>`;
+    if (i === last) s += `<text class="vlbl" x="${cx}" y="${v < 0 ? y(v) + 14 : y(v) - 6}" text-anchor="${i === labels.length - 1 && W < 420 ? 'end' : 'middle'}" ${i === labels.length - 1 && W < 420 ? `dx="${bw / 2}"` : ''}>${vl(v)}</text>`;
     s += `<rect x="${m.l + band * i}" y="${m.t}" width="${band}" height="${H - m.t - m.b}" fill="transparent" data-i="${i}"/>`;
   });
   s += `<text x="${m.l - 8}" y="10" text-anchor="end">${esc(unit)}</text></svg>`;
   host.innerHTML = s;
   const tip = tipEl(host);
   host.querySelectorAll('rect[data-i]').forEach(r => {
-    r.addEventListener('mousemove', e => {
+    const show = e => {
       const i = +r.dataset.i, b = host.getBoundingClientRect();
       tip.innerHTML = `<b>${esc(labels[i])}</b>${fmt(values[i])}`;
       placeTip(tip, host, e.clientX - b.left, e.clientY - b.top);
-    });
-    r.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+    };
+    r.addEventListener('pointermove', show); r.addEventListener('pointerdown', show);
+    r.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') tip.style.display = 'none'; });
   });
 }
 
 // 선(국가별 다계열) + 십자선 툴팁
 function lineChart(host, { years, series, fmt, tickFmt }) {
-  const W = 760, H = 300, m = { l: 64, r: 120, t: 16, b: 28 };
+  const W = Math.max(260, Math.round(host.clientWidth || 760)), narrow = W < 560;
+  const H = narrow ? 240 : 300, m = { l: narrow ? 52 : 64, r: narrow ? 14 : 120, t: 16, b: 28 };
   const all = []; series.forEach(se => years.forEach(y => { if (isNum(se.v[y])) all.push(se.v[y]); }));
   if (!all.length) { host.innerHTML = '<p class="muted small">이 조합에는 자료가 없다.</p>'; return; }
   const ticks = niceTicks(Math.min(0, ...all), Math.max(...all, 0), 5);
@@ -162,13 +165,14 @@ function lineChart(host, { years, series, fmt, tickFmt }) {
   // 끝점 직접 라벨(겹치면 아래로 밀기)
   ends.sort((a, b) => a.yy - b.yy);
   for (let i = 1; i < ends.length; i++) if (ends[i].yy - ends[i - 1].yy < 14) ends[i].yy = ends[i - 1].yy + 14;
-  ends.forEach(e => { s += `<text class="lbl" x="${W - m.r + 8}" y="${e.yy + 4}">${esc(e.name)}</text>`; });
+  if (!narrow) ends.forEach(e => { s += `<text class="lbl" x="${W - m.r + 8}" y="${e.yy + 4}">${esc(e.name)}</text>`; });
   s += `<line class="xh" x1="0" x2="0" y1="${m.t}" y2="${H - m.b}" stroke="var(--text-3)" stroke-width="1" style="display:none"/>`;
   s += `<rect class="hit" x="${m.l - 20}" y="${m.t}" width="${W - m.l - m.r + 40}" height="${H - m.t - m.b}" fill="transparent"/>`;
   s += '</svg>';
   host.innerHTML = s;
   const svg = host.querySelector('svg'), xh = svg.querySelector('.xh'), tip = tipEl(host);
-  svg.querySelector('.hit').addEventListener('mousemove', e => {
+  const hit = svg.querySelector('.hit');
+  const show = e => {
     const b = svg.getBoundingClientRect(), sx = (e.clientX - b.left) * W / b.width;
     let i = Math.round((sx - m.l) / ((W - m.l - m.r) / Math.max(1, years.length - 1)));
     i = Math.max(0, Math.min(years.length - 1, i));
@@ -178,9 +182,21 @@ function lineChart(host, { years, series, fmt, tickFmt }) {
       `<div class="row"><span><i style="background:${se.color}"></i>${esc(se.name)}</span><span>${fmt(se.v[yr])}${se.n && se.n[yr] ? ` <span class="muted">(${se.n[yr]}곳)</span>` : ''}</span></div>`).join('');
     const hb = host.getBoundingClientRect();
     placeTip(tip, host, x(i) * b.width / W + (b.left - hb.left), e.clientY - hb.top);
-  });
-  svg.querySelector('.hit').addEventListener('mouseleave', () => { xh.style.display = 'none'; tip.style.display = 'none'; });
+  };
+  hit.addEventListener('pointermove', show); hit.addEventListener('pointerdown', show);
+  hit.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') { xh.style.display = 'none'; tip.style.display = 'none'; } });
 }
+
+let CHARTS = [];
+function chart(fn) { CHARTS.push(fn); fn(); }
+let lastW = window.innerWidth, rzT = null;
+window.addEventListener('resize', () => {
+  if (window.innerWidth === lastW) return; lastW = window.innerWidth;
+  clearTimeout(rzT); rzT = setTimeout(() => CHARTS.forEach(f => f()), 150);
+});
+document.addEventListener('pointerdown', e => {
+  if (!e.target.closest('.chart')) document.querySelectorAll('.tip').forEach(t => { t.style.display = 'none'; });
+});
 
 // ---------- 기관 목록 ----------
 const listState = { cat: 'all', sort: { key: 'TA', dir: -1 } };
@@ -191,7 +207,9 @@ function renderHome() {
   let h = `<h1>독일에 진출한 한·중·일 금융기관</h1>
   <p class="lead">독일 상업등기부(Unternehmensregister)에 공시된 HGB 개별재무제표로 정리한 15개 기관의 최근 실적이다.
   기관 이름을 누르면 연도별 재무제표와 지표를 볼 수 있다. 금액 단위는 백만 유로.</p>
-  <div class="controls"><label class="ctl">업종</label>${seg('cat', cats, listState.cat)}</div>`;
+  <div class="controls"><label class="ctl">업종</label>${seg('cat', cats, listState.cat)}
+  <label class="ctl only-mob">정렬 <select id="msort">${[['TA', '총자산'], ['NI', '당기순이익'], ['roa', 'ROA'], ['employees', '직원 수'], ['inst', '이름']].map(([k, l]) =>
+    `<option value="${k}" ${listState.sort.key === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>`;
   const cols = [
     ['inst', '기관', false], ['form', '성격', false], ['latest', '기준연도', false],
     ['TA', '총자산', true], ['Liab', '부채', true], ['Eq', '자본', true], ['NI', '당기순이익', true],
@@ -208,7 +226,8 @@ function renderHome() {
       return (va > vb ? 1 : va < vb ? -1 : 0) * dir;
     });
     h += `<div class="country-head"><span class="dot" style="background:${CCOLOR[c]}"></span><h2>${c}</h2><span class="muted small">${list.length}곳</span></div>
-    <div class="card flush"><div class="table-scroll"><table><thead><tr>` +
+    <div class="mcards only-mob">${list.map(instCard).join('')}</div>
+    <div class="card flush only-desk"><div class="table-scroll"><table><thead><tr>` +
       cols.map(([k, l, num]) => `<th class="sortable${num ? ' num' : ''}" data-k="${k}">${l}${key === k ? `<span class="arrow">${dir > 0 ? '▲' : '▼'}</span>` : ''}</th>`).join('') +
       `</tr></thead><tbody>`;
     list.forEach(i => {
@@ -227,11 +246,25 @@ function renderHome() {
   지점의 자본은 본점이 낸 출연자본이라 법인 자본과 성격이 다르다. 경비율은 (관리비+감가상각)÷순영업수익, ROA는 평균 총자산 기준이다.</div>`;
   $app.innerHTML = h;
   onSeg('cat', v => { listState.cat = v; renderHome(); });
+  document.getElementById('msort').addEventListener('change', e => {
+    const k = e.target.value; listState.sort = { key: k, dir: k === 'inst' ? 1 : -1 }; renderHome();
+  });
   $app.querySelectorAll('th.sortable').forEach(th => th.addEventListener('click', () => {
     const k = th.dataset.k;
     listState.sort = listState.sort.key === k ? { key: k, dir: -listState.sort.dir } : { key: k, dir: ['inst', 'form', 'latest'].includes(k) ? 1 : -1 };
     renderHome();
   }));
+}
+
+function instCard(i) {
+  const r = latestRow(i);
+  const cell = (k, v, c = '') => `<div><span class="k">${k}</span><span class="v${c}">${v}</span></div>`;
+  return `<a class="mcard" href="#/inst/${i.id}">
+    <div class="mtop"><span class="mname">${esc(i.ko)}</span><span class="badge">${FORM_LABEL[i.form]}</span></div>
+    <div class="msub">${esc(i.name)} · ${fyLabel(i, i.latest)}${i.fye === 3 ? '(3월 결산)' : ''} 기준</div>
+    <div class="mgrid">${cell('총자산', money(r.TA))}${cell('부채', money(r.Liab))}${cell('자본', money(r.Eq))}
+      ${cell('당기순이익', money(r.NI), cls(r.NI))}${cell('ROA', pct(r.roa), cls(r.roa))}${cell('직원 수', emp(r.employees))}</div>
+  </a>`;
 }
 
 // ---------- 기관 상세 ----------
@@ -258,7 +291,7 @@ function renderInst(id) {
     <div class="card"><h3>당기순이익</h3><div class="chart" id="c-ni"></div></div>
   </div>
   <h2>연도별 지표</h2>
-  <div class="card flush"><div class="table-scroll"><table><thead><tr><th>지표</th>${ys.map(y => `<th class="num">${fyLabel(i, y)}</th>`).join('')}</tr></thead><tbody>`;
+  <div class="card flush"><div class="table-scroll"><table class="sticky"><thead><tr><th>지표</th>${ys.map(y => `<th class="num">${fyLabel(i, y)}</th>`).join('')}</tr></thead><tbody>`;
   const rows = ['TA', 'Liab', 'Eq', 'NII', 'Pretax', 'NI', 'nii_avg_ta', 'nfi_share', 'cir', 'credit_cost', 'roa',
     i.form === 'branch' ? null : 'roe', 'eq_ta', 'fund_cust', 'fund_intra', 'intra_assets', 'ltc_share',
     i.category === 'captive' ? 'lease_share' : 'sec_share', 'employees', 'ta_per_emp'].filter(Boolean);
@@ -271,7 +304,7 @@ function renderInst(id) {
   <p class="muted small">비율은 기초·기말 평균 잔액 기준(2021년은 2020년 말 잔액 사용). ${i.form === 'branch' ? '지점 ROE는 출연자본 기준이라 표시하지 않았다. ' : ''}${i.fye === 3 ? '3월 결산: FY2024 = 2024.4~2025.3.' : ''}</p>
   <h2>재무제표</h2>
   <div class="controls">${seg('unit', [['m', '백만 유로'], ['k', '천 유로']], detState.unit)}
-    <span class="muted small">비용은 음수. 셀에 마우스를 올리면 원문 파일과 쪽이 나온다.</span></div>
+    <span class="muted small">비용은 음수. 숫자를 누르거나 마우스를 올리면 원문 파일과 쪽이 나온다.</span></div>
   <div class="card flush">
     <div class="tabs" id="stabs">${[['assets', '대차대조표 · 자산'], ['liab', '대차대조표 · 부채와 자본'], ['pl', '손익계산서']].map(([k, l]) =>
       `<button type="button" data-v="${k}" class="${detState.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
@@ -284,8 +317,8 @@ function renderInst(id) {
       `</ol></details></div>`;
   }
   $app.innerHTML = h;
-  barChart(document.getElementById('c-ta'), { labels: ys.map(y => fyLabel(i, y)), values: ys.map(y => i.ratios[y].TA), fmt: v => money(v) + ' 백만 유로', unit: '백만 유로' });
-  barChart(document.getElementById('c-ni'), { labels: ys.map(y => fyLabel(i, y)), values: ys.map(y => i.ratios[y].NI), fmt: v => money(v) + ' 백만 유로', unit: '백만 유로' });
+  chart(() => barChart(document.getElementById('c-ta'), { labels: ys.map(y => fyLabel(i, y)), values: ys.map(y => i.ratios[y].TA), fmt: v => money(v) + ' 백만 유로', unit: '백만 유로' }));
+  chart(() => barChart(document.getElementById('c-ni'), { labels: ys.map(y => fyLabel(i, y)), values: ys.map(y => i.ratios[y].NI), fmt: v => money(v) + ' 백만 유로', unit: '백만 유로' }));
   drawStatement(i);
   onSeg('unit', v => { detState.unit = v; drawStatement(i); document.querySelectorAll('#unit button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); });
   document.getElementById('stabs').addEventListener('click', e => {
@@ -306,7 +339,7 @@ function kpi(k, v, u, raw) {
 }
 function drawStatement(i) {
   const rows = i.stm[detState.tab], ys = i.years;
-  let h = `<table><thead><tr><th>항목</th>${ys.map(y => `<th class="num">${fyLabel(i, y)}</th>`).join('')}</tr></thead><tbody>`;
+  let h = `<table class="sticky"><thead><tr><th>항목</th>${ys.map(y => `<th class="num">${fyLabel(i, y)}</th>`).join('')}</tr></thead><tbody>`;
   rows.forEach(r => {
     const c = r.lvl === -1 ? (['TA', 'TL', 'NI'].includes(r.key) ? 'total' : 'bold') : r.lvl > 0 ? `lvl${r.lvl}` : '';
     h += `<tr class="${c}"><td class="label">${esc(r.label)}</td>` + ys.map(y => {
@@ -315,7 +348,20 @@ function drawStatement(i) {
     }).join('') + '</tr>';
   });
   h += '</tbody></table>';
-  document.getElementById('stm').innerHTML = h;
+  const host = document.getElementById('stm');
+  host.innerHTML = h;
+  host.onclick = e => {
+    const td = e.target.closest('td.num'); if (!td || !td.title) return;
+    const tr = td.parentElement, col = [...tr.children].indexOf(td);
+    toast(`${tr.children[0].textContent} · ${host.querySelectorAll('th')[col].textContent}: ${td.textContent}<br><span class="muted">${esc(td.title)}</span>`);
+  };
+}
+let toastT = null;
+function toast(html) {
+  let t = document.getElementById('toast');
+  if (!t) { t = document.createElement('div'); t.id = 'toast'; document.body.appendChild(t); }
+  t.innerHTML = html; t.classList.add('on');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 3500);
 }
 
 // ---------- 국가별 비교 ----------
@@ -336,7 +382,8 @@ function renderCompare() {
     <label class="ctl">업종</label>${seg('ccat', cats, cat)}
     <label class="ctl">연도 <select id="cyear">${years.map(y => `<option ${y === year ? 'selected' : ''}>${y}</option>`).join('')}</select></label>
   </div>
-  <div class="card flush"><div class="table-scroll"><table><thead><tr>
+  <div class="mcards only-mob">${CMP_ROWS.map(c => cmpCard(c, cat, year)).join('') || '<p class="muted">이 연도·업종에는 자료가 없다.</p>'}</div>
+  <div class="card flush only-desk"><div class="table-scroll"><table><thead><tr>
     <th>국가</th><th class="num">기관 수</th><th class="num">총자산</th><th class="num">부채</th><th class="num">자본</th><th class="num">당기순이익</th>
     <th class="num">직원 수</th><th class="num" title="${METRICS.nii_avg_ta.desc}">순이자이익/평균자산</th><th class="num" title="${METRICS.cir.desc}">경비율</th>
     <th class="num" title="${METRICS.credit_cost.desc}">대손비용률</th><th class="num">ROA</th><th class="num" title="${METRICS.roe_nonbranch.desc}">ROE(법인만)</th>
@@ -388,8 +435,8 @@ function renderCompare() {
   document.getElementById('lg').innerHTML = series.map(s =>
     `<span><i class="${s.dash ? 'dash' : ''}" style="background:${s.color};border-color:${s.color}"></i>${s.name}</span>`).join('');
   const tickFmt = M.amount || metric === 'ta_per_emp' ? t => minus(nf0.format(t / 1000)) : metric === 'employees' ? t => nf0.format(t) : t => minus((t * 100).toFixed(Math.abs(t) < 0.05 ? 2 : 1)) + '%';
-  lineChart(document.getElementById('cline'), { years, series, fmt: M.fmt, tickFmt });
-  let t = `<table><thead><tr><th>${M.label}${M.unit ? ` <span class="muted small">${M.unit}</span>` : ''}</th>${years.map(y => `<th class="num">${y}</th>`).join('')}</tr></thead><tbody>`;
+  chart(() => lineChart(document.getElementById('cline'), { years, series, fmt: M.fmt, tickFmt }));
+  let t = `<table class="sticky"><thead><tr><th>${M.label}${M.unit ? ` <span class="muted small">${M.unit}</span>` : ''}</th>${years.map(y => `<th class="num">${y}</th>`).join('')}</tr></thead><tbody>`;
   CMP_ROWS.forEach(c => {
     if (!years.some(y => agg(c, cat, y))) return;
     if (c === '일본(SMBC 제외)' && !series.find(s => s.name === c)) return;
@@ -400,6 +447,19 @@ function renderCompare() {
   });
   t += '</tbody></table>';
   document.getElementById('ctab').innerHTML = t;
+}
+function cmpCard(c, cat, year) {
+  const a = agg(c, cat, year);
+  if (!a) return '';
+  if (c === '일본(SMBC 제외)' && !(agg('일본', cat, year) || {}).inst?.includes('SMBC Bank EU AG')) return '';
+  const cell = (k, v, cl = '') => `<div><span class="k">${k}</span><span class="v${cl}">${v}</span></div>`;
+  return `<div class="mcard${c === '전체' ? ' mtotal' : ''}">
+    <div class="mtop"><span class="mname"><span class="dot" style="background:${CCOLOR[c]};margin-right:6px"></span>${c}</span><span class="muted small">${a.n}곳</span></div>
+    <div class="mgrid">${cell('총자산', money(a.TA))}${cell('부채', money(a.Liab))}${cell('자본', money(a.Eq))}
+      ${cell('당기순이익', money(a.NI), cls(a.NI))}${cell('직원 수', a.employees != null ? emp(a.employees) : '–')}${cell('ROA', pct(a.roa), cls(a.roa))}
+      ${cell('순이자이익/평균자산', pct(a.nii_avg_ta))}${cell('경비율', pct(a.cir, 1))}${cell('대손비용률', pct(a.credit_cost))}
+      ${cell('ROE(법인만)', pct(a.roe_nonbranch, 1), cls(a.roe_nonbranch))}${cell('자본/총자산', pct(a.eq_ta, 1))}${cell('본점·그룹 조달', pct(a.fund_intra, 1))}</div>
+  </div>`;
 }
 function compositionList(cat, year) {
   const byC = COUNTRIES.map(c => {
@@ -437,6 +497,7 @@ function route() {
   if (h && !h.startsWith('#/')) return; // 각주 앵커 등
   const parts = h.replace(/^#\/?/, '').split('/');
   const page = parts[0] || 'home';
+  CHARTS = [];
   document.querySelectorAll('nav.main a').forEach(a => a.classList.toggle('on', a.dataset.nav === (page === 'inst' ? 'home' : page)));
   if (page === 'inst') renderInst(parts[1]);
   else if (page === 'compare') renderCompare();
@@ -452,7 +513,7 @@ document.getElementById('theme').addEventListener('click', () => {
   try { localStorage.setItem('theme', root.dataset.theme); } catch (e) {}
 });
 
-fetch('data.json').then(r => r.json()).then(d => {
+fetch('data.json?v=3').then(r => r.json()).then(d => {
   DATA = d;
   document.getElementById('gen').textContent = `자료 생성 ${d.generated}.`;
   window.addEventListener('hashchange', route);
